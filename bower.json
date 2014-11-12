@@ -1,0 +1,29 @@
+{
+  "name": "my-component",
+  "main": "dist/my-component.min.js",
+  "version": "0.0.1",
+  "homepage": "https://github.com/JedWatson/react-input-autosize",
+  "authors": [
+    "Jed Watson"
+  ],
+  "description": "My React Component",
+  "moduleType": [
+    "amd",
+    "globals",
+    "node"
+  ],
+  "keywords": [
+    "react",
+    "react-component"
+  ],
+  "license": "MIT",
+  "ignore": [
+    ".editorconfig",
+    ".gitignore",
+    "package.json",
+    "src",
+    "node_modules",
+    "example",
+    "test"
+  ]
+}
