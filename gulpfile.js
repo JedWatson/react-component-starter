@@ -1,4 +1,5 @@
 var browserify = require('browserify'),
+	shim = require('browserify-shim'),
 	chalk = require('chalk'),
 	del = require('del'),
 	gulp = require('gulp'),
@@ -16,17 +17,24 @@ var browserify = require('browserify'),
  * Constants
  */
 
-var PACKAGE_NAME = require('./package.json').name;
-var PACKAGE_FILE = 'Component.js';
+var SRC_PATH = 'src';
+var DIST_PATH = 'dist';
+
+var PACKAGE_FILE = 'MyComponent.js';
+var PACKAGE_NAME = 'my-component';
+var COMPONENT_NAME = 'MyComponent';
+
 var DEPENDENCIES = ['react'];
 
-var SRC_PATH = './src';
-var DIST_PATH = './dist';
+var EXAMPLE_SRC_PATH = 'example/src';
+var EXAMPLE_DIST_PATH = 'example/dist';
 
-var EXAMPLE_APP = './example/src/app.js';
-var EXAMPLE_LESS = './example/src/app.less';
-var EXAMPLE_FILES = ['./example/src/index.html'];
-var EXAMPLE_DIST = './example/dist';
+var EXAMPLE_APP = 'app.js';
+var EXAMPLE_LESS = 'app.less';
+var EXAMPLE_FILES = [
+	'index.html',
+	'standalone.html'
+];
 
 
 /**
@@ -67,7 +75,7 @@ function watchBundle(target, name, dest) {
  */
 
 gulp.task('prepare:examples', function(done) {
-	del([EXAMPLE_DIST], done);
+	del([EXAMPLE_DIST_PATH], done);
 });
 
 
@@ -76,8 +84,9 @@ gulp.task('prepare:examples', function(done) {
  */
 
 function buildExampleFiles() {
-	return gulp.src(EXAMPLE_FILES)
-		.pipe(gulp.dest(EXAMPLE_DIST));
+	return gulp.src(EXAMPLE_FILES.map(function(i) { return EXAMPLE_SRC_PATH + '/' + i }))
+		.pipe(gulp.dest(EXAMPLE_DIST_PATH))
+		.pipe(connect.reload());
 }
 
 gulp.task('dev:build:example:files', buildExampleFiles);
@@ -89,9 +98,9 @@ gulp.task('build:example:files', ['prepare:examples'], buildExampleFiles);
  */
 
 function buildExampleCSS() {
-	return gulp.src(EXAMPLE_LESS)
+	return gulp.src(EXAMPLE_SRC_PATH + '/' + EXAMPLE_LESS)
 		.pipe(less())
-		.pipe(gulp.dest(EXAMPLE_DIST))
+		.pipe(gulp.dest(EXAMPLE_DIST_PATH))
 		.pipe(connect.reload());
 }
 
@@ -107,38 +116,40 @@ gulp.task('build:example:css', ['prepare:examples'], buildExampleCSS);
 
 function buildExampleScripts(dev) {
 	
-	return function() {
+	var dest = EXAMPLE_DIST_PATH;
 	
-		var dest = EXAMPLE_DIST;
-		
-		var opts = dev ? watchify.args : {};
-		
-		opts.debug = dev ? true : false;
-		opts.hasExports = true;
+	var opts = dev ? watchify.args : {};
+	opts.debug = dev ? true : false;
+	opts.hasExports = true;
+	
+	return function() {
 		
 		var common = browserify(opts),
-			bundle = browserify(opts),
-			example = browserify(opts);
+			bundle = browserify(opts).require('./' + SRC_PATH + '/' + PACKAGE_FILE, { expose: PACKAGE_NAME }),
+			example = browserify(opts).exclude(PACKAGE_NAME).add('./' + EXAMPLE_SRC_PATH + '/' + EXAMPLE_APP),
+			standalone = browserify('./' + SRC_PATH + '/' + PACKAGE_FILE, { standalone: COMPONENT_NAME })
+				.transform(reactify)
+				.transform(shim);
 		
 		DEPENDENCIES.forEach(function(pkg) {
 			common.require(pkg);
 			bundle.exclude(pkg);
 			example.exclude(pkg);
+			standalone.exclude(pkg);
 		});
-		
-		bundle.require(SRC_PATH + '/' + PACKAGE_FILE, { expose: PACKAGE_NAME });
-		example.exclude(PACKAGE_NAME).add(EXAMPLE_APP);
 		
 		if (dev) {
 			watchBundle(common, 'common.js', dest);
 			watchBundle(bundle, 'bundle.js', dest);
 			watchBundle(example, 'app.js', dest);
+			watchBundle(standalone, 'standalone.js', dest);
 		}
 		
 		return merge(
 			doBundle(common, 'common.js', dest),
 			doBundle(bundle, 'bundle.js', dest),
-			doBundle(example, 'app.js', dest)
+			doBundle(example, 'app.js', dest),
+			doBundle(standalone, 'standalone.js', dest)
 		);
 		
 	}
@@ -159,6 +170,15 @@ gulp.task('build:examples', [
 	'build:example:scripts'
 ]);
 
+gulp.task('watch:examples', [
+	'dev:build:example:files',
+	'dev:build:example:css',
+	'dev:build:example:scripts'
+], function() {
+	gulp.watch(EXAMPLE_FILES.map(function(i) { return EXAMPLE_SRC_PATH + '/' + i }), ['dev:build:example:files']);
+	gulp.watch([EXAMPLE_SRC_PATH + './' + EXAMPLE_LESS], ['dev:build:example:css']);
+});
+
 
 /**
  * Serve task for local development
@@ -177,10 +197,10 @@ gulp.task('dev:server', function() {
  * Development task
  */
 
-gulp.task('dev', ['dev:server', 'dev:build:example:files', 'dev:build:example:css', 'dev:build:example:scripts'], function() {
-	gulp.watch([EXAMPLE_FILES], ['dev:build:example:files']);
-	gulp.watch([EXAMPLE_LESS], ['dev:build:example:css']);
-});
+gulp.task('dev', [
+	'dev:server',
+	'watch:examples'
+]);
 
 
 /**
@@ -192,18 +212,25 @@ gulp.task('prepare:dist', function(done) {
 });
 
 gulp.task('build:dist', ['prepare:dist'], function() {
-	var dest = DIST_PATH;
-	var bundle = browserify({ hasExports: true });
+	
+	var standalone = browserify('./' + SRC_PATH + '/' + PACKAGE_FILE, {
+			standalone: COMPONENT_NAME
+		})
+		.transform(reactify)
+		.transform(shim);
+	
 	DEPENDENCIES.forEach(function(pkg) {
-		bundle.exclude(pkg);
+		standalone.exclude(pkg);
 	});
-	bundle.require(SRC_PATH + '/' + PACKAGE_FILE, { expose: PACKAGE_NAME });
-	return doBundle(bundle, PACKAGE_FILE, dest);
+	
+	return doBundle(standalone, PACKAGE_FILE, DIST_PATH);
+	
 });
 
-gulp.task('build', ['build:dist', 'build:examples'], function() {
-
-});
+gulp.task('build', [
+	'build:dist',
+	'build:examples'
+]);
 
 
 /**
@@ -211,5 +238,5 @@ gulp.task('build', ['build:dist', 'build:examples'], function() {
  */
 
 gulp.task('deploy', ['build:examples'], function() {
-	return gulp.src(EXAMPLE_DIST + '/**/*').pipe(deploy());
+	return gulp.src(EXAMPLE_DIST_PATH + '/**/*').pipe(deploy());
 });

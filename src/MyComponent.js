@@ -1,6 +1,6 @@
 var React = require('react');
 
-var ExampleComponent = React.createClass({
+var MyComponent = React.createClass({
 	
 	render: function() {
 		return <div>My Component</div>;
@@ -8,4 +8,4 @@ var ExampleComponent = React.createClass({
 	
 });
 
-module.exports = ExampleComponent;
+module.exports = MyComponent;

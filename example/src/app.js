@@ -1,11 +1,11 @@
 var React = require('react'),
-	ExampleComponent = require('react-component-starter');
+	MyComponent = require('my-component');
 
 var App = React.createClass({
 	render: function() {
 		return (
 			<div>
-				<ExampleComponent />
+				<MyComponent />
 			</div>
 		)
 	}
