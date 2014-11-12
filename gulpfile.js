@@ -3,9 +3,13 @@ var browserify = require('browserify'),
 	chalk = require('chalk'),
 	del = require('del'),
 	gulp = require('gulp'),
+	bump = require('gulp-bump'),
 	connect = require('gulp-connect'),
 	deploy = require("gulp-gh-pages"),
 	less = require('gulp-less'),
+	rename = require('gulp-rename'),
+	streamify = require('gulp-streamify'),
+	uglify = require('gulp-uglify'),
 	gutil = require('gulp-util'),
 	merge = require('merge-stream'),
 	reactify = require('reactify'),
@@ -223,7 +227,15 @@ gulp.task('build:dist', ['prepare:dist'], function() {
 		standalone.exclude(pkg);
 	});
 	
-	return doBundle(standalone, PACKAGE_FILE, DIST_PATH);
+	return standalone.bundle()
+		.on('error', function(e) {
+			gutil.log('Browserify Error', e);
+		})
+		.pipe(source(PACKAGE_NAME + '.js'))
+		.pipe(gulp.dest(DIST_PATH))
+		.pipe(rename(PACKAGE_NAME + '.min.js'))
+		.pipe(streamify(uglify()))
+		.pipe(gulp.dest(DIST_PATH));
 	
 });
 
@@ -234,9 +246,58 @@ gulp.task('build', [
 
 
 /**
- * Deploy task
+ * Version bump tasks
  */
 
-gulp.task('deploy', ['build:examples'], function() {
+function getBumpTask(type) {
+	return function() {
+		return gulp.src(['./package.json', './bower.json'])
+			.pipe(bump({ type: type }))
+			.pipe(gulp.dest('./'));
+	};
+}
+
+gulp.task('bump', getBumpTask('patch'));
+gulp.task('bump:minor', getBumpTask('minor'));
+gulp.task('bump:major', getBumpTask('major'));
+
+
+/**
+ * Git tag task
+ * (version *must* be bumped first)
+ */
+
+gulp.task('publish:tag', function() {
+	var pkg = require('./package.json');
+	var v = 'v' + pkg.version;
+	var message = 'Release ' + v;
+
+	return gulp.src('./')
+		.pipe(git.commit(message))
+		.pipe(git.tag(v, message))
+		.pipe(git.push('origin', 'master', '--tags'))
+		.pipe(gulp.dest('./'));
+});
+
+
+/**
+ * npm publish task
+ * * (version *must* be bumped first)
+ */
+
+gulp.task('publish:npm', function(done) {
+	require('child_process')
+		.spawn('npm', ['publish'], { stdio: 'inherit' })
+		.on('close', done);
+});
+
+
+/**
+ * Deploy tasks
+ */
+
+gulp.task('publish:examples', ['build:examples'], function() {
 	return gulp.src(EXAMPLE_DIST_PATH + '/**/*').pipe(deploy());
 });
+
+gulp.task('release', ['publish:tag', 'publish:npm', 'publish:examples']);
