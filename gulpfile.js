@@ -6,6 +6,7 @@ var browserify = require('browserify'),
 	bump = require('gulp-bump'),
 	connect = require('gulp-connect'),
 	deploy = require("gulp-gh-pages"),
+	git = require("gulp-git"),
 	less = require('gulp-less'),
 	rename = require('gulp-rename'),
 	streamify = require('gulp-streamify'),
@@ -190,7 +191,7 @@ gulp.task('watch:examples', [
 
 gulp.task('dev:server', function() {
 	connect.server({
-		root: 'example/dist',
+		root: EXAMPLE_DIST_PATH,
 		port: 8000,
 		livereload: true
 	});
@@ -267,16 +268,18 @@ gulp.task('bump:major', getBumpTask('major'));
  * (version *must* be bumped first)
  */
 
-gulp.task('publish:tag', function() {
+gulp.task('publish:tag', function(done) {
 	var pkg = require('./package.json');
 	var v = 'v' + pkg.version;
 	var message = 'Release ' + v;
 
-	return gulp.src('./')
-		.pipe(git.commit(message))
-		.pipe(git.tag(v, message))
-		.pipe(git.push('origin', 'master', '--tags'))
-		.pipe(gulp.dest('./'));
+	git.tag(v, message, function (err) {
+		if (err) throw err;
+		git.push('origin', v, function (err) {
+			if (err) throw err;
+			done();
+		});
+	});
 });
 
 
