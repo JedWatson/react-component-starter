@@ -14,6 +14,7 @@ var browserify = require('browserify'),
 	gutil = require('gulp-util'),
 	merge = require('merge-stream'),
 	reactify = require('reactify'),
+	run = require('run-sequence'),
 	source = require('vinyl-source-stream'),
 	watchify = require('watchify');
 
@@ -65,7 +66,7 @@ function watchBundle(target, name, dest) {
  * Prepare task for examples
  */
 
-gulp.task('prepare:examples', function(done) {
+gulp.task('clean:examples', function(done) {
 	del([config.example.dist], done);
 });
 
@@ -74,29 +75,23 @@ gulp.task('prepare:examples', function(done) {
  * Build example files
  */
 
-function buildExampleFiles() {
+gulp.task('build:example:files', function() {
 	return gulp.src(config.example.files.map(function(i) { return config.example.src + '/' + i }))
 		.pipe(gulp.dest(config.example.dist))
 		.pipe(connect.reload());
-}
-
-gulp.task('dev:build:example:files', buildExampleFiles);
-gulp.task('build:example:files', ['prepare:examples'], buildExampleFiles);
+});
 
 
 /**
  * Build example css from less
  */
 
-function buildExampleCSS() {
+gulp.task('build:example:css', function() {
 	return gulp.src(config.example.src + '/' + config.example.stylesheets)
 		.pipe(less())
 		.pipe(gulp.dest(config.example.dist))
 		.pipe(connect.reload());
-}
-
-gulp.task('dev:build:example:css', buildExampleCSS);
-gulp.task('build:example:css', ['prepare:examples'], buildExampleCSS);
+});
 
 
 /**
@@ -158,27 +153,33 @@ function buildExampleScripts(dev) {
 
 };
 
-gulp.task('dev:build:example:scripts', buildExampleScripts(true));
-gulp.task('build:example:scripts', ['prepare:examples'], buildExampleScripts());
+gulp.task('watch:example:scripts', buildExampleScripts(true));
+gulp.task('build:example:scripts', buildExampleScripts());
 
 
 /**
  * Build examples
  */
 
-gulp.task('build:examples', [
-	'build:example:files',
-	'build:example:css',
-	'build:example:scripts'
-]);
+gulp.task('build:examples', function(callback) {
+	run(
+		'clean:examples',
+		[
+			'build:example:files',
+			'build:example:css',
+			'build:example:scripts'
+		],
+		callback
+	);
+});
 
 gulp.task('watch:examples', [
-	'dev:build:example:files',
-	'dev:build:example:css',
-	'dev:build:example:scripts'
+	'build:example:files',
+	'build:example:css',
+	'watch:example:scripts'
 ], function() {
-	gulp.watch(config.example.files.map(function(i) { return config.example.src + '/' + i }), ['dev:build:example:files']);
-	gulp.watch([config.example.src + './' + config.example.stylesheets], ['dev:build:example:css']);
+	gulp.watch(config.example.files.map(function(i) { return config.example.src + '/' + i }), ['build:example:files']);
+	gulp.watch([config.example.src + './' + config.example.stylesheets], ['build:example:css']);
 });
 
 
@@ -209,11 +210,11 @@ gulp.task('dev', [
  * Build task
  */
 
-gulp.task('prepare:dist', function(done) {
+gulp.task('clean:dist', function(done) {
 	del([config.component.dist], done);
 });
 
-gulp.task('build:dist', ['prepare:dist'], function() {
+gulp.task('build:dist', ['clean:dist'], function() {
 	
 	var standalone = browserify('./' + config.component.src + '/' + config.component.file, {
 			standalone: config.component.name
