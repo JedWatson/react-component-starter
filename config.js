@@ -8,7 +8,7 @@ var COMPONENT_NAME = 'MyComponent';
 var pkg = JSON.parse(require('fs').readFileSync('./package.json'));
 
 // Default dependencies from package.json, except reactify (which is used for
-// the build). They can be customised if required by hard-coding this array.
+// the build). Dependencies can be customised by hard-coding this array.
 var dependencies = [];
 Object.keys(pkg.dependencies).forEach(function(i) {
 	if (i !== 'reactify') dependencies.push(i);
