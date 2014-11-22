@@ -19,27 +19,13 @@ var browserify = require('browserify'),
 
 
 /**
- * Constants
+ * Task configuration is loaded from config.js
+ * 
+ * Make any changes to the source or distribution files
+ * and directory configuration there
  */
 
-var SRC_PATH = 'src';
-var DIST_PATH = 'dist';
-
-var PACKAGE_FILE = 'MyComponent.js';
-var PACKAGE_NAME = 'my-component';
-var COMPONENT_NAME = 'MyComponent';
-
-var DEPENDENCIES = ['react'];
-
-var EXAMPLE_SRC_PATH = 'example/src';
-var EXAMPLE_DIST_PATH = 'example/dist';
-
-var EXAMPLE_APP = 'app.js';
-var EXAMPLE_LESS = 'app.less';
-var EXAMPLE_FILES = [
-	'index.html',
-	'standalone.html'
-];
+var config = require('./config');
 
 
 /**
@@ -80,7 +66,7 @@ function watchBundle(target, name, dest) {
  */
 
 gulp.task('prepare:examples', function(done) {
-	del([EXAMPLE_DIST_PATH], done);
+	del([config.example.dist], done);
 });
 
 
@@ -89,8 +75,8 @@ gulp.task('prepare:examples', function(done) {
  */
 
 function buildExampleFiles() {
-	return gulp.src(EXAMPLE_FILES.map(function(i) { return EXAMPLE_SRC_PATH + '/' + i }))
-		.pipe(gulp.dest(EXAMPLE_DIST_PATH))
+	return gulp.src(config.example.files.map(function(i) { return config.example.src + '/' + i }))
+		.pipe(gulp.dest(config.example.dist))
 		.pipe(connect.reload());
 }
 
@@ -103,9 +89,9 @@ gulp.task('build:example:files', ['prepare:examples'], buildExampleFiles);
  */
 
 function buildExampleCSS() {
-	return gulp.src(EXAMPLE_SRC_PATH + '/' + EXAMPLE_LESS)
+	return gulp.src(config.example.src + '/' + config.example.stylesheets)
 		.pipe(less())
-		.pipe(gulp.dest(EXAMPLE_DIST_PATH))
+		.pipe(gulp.dest(config.example.dist))
 		.pipe(connect.reload());
 }
 
@@ -121,7 +107,7 @@ gulp.task('build:example:css', ['prepare:examples'], buildExampleCSS);
 
 function buildExampleScripts(dev) {
 	
-	var dest = EXAMPLE_DIST_PATH;
+	var dest = config.example.dist;
 	
 	var opts = dev ? watchify.args : {};
 	opts.debug = dev ? true : false;
@@ -130,32 +116,43 @@ function buildExampleScripts(dev) {
 	return function() {
 		
 		var common = browserify(opts),
-			bundle = browserify(opts).require('./' + SRC_PATH + '/' + PACKAGE_FILE, { expose: PACKAGE_NAME }),
-			example = browserify(opts).exclude(PACKAGE_NAME).add('./' + EXAMPLE_SRC_PATH + '/' + EXAMPLE_APP),
-			standalone = browserify('./' + SRC_PATH + '/' + PACKAGE_FILE, { standalone: COMPONENT_NAME })
+			bundle = browserify(opts).require('./' + config.component.src + '/' + config.component.file, { expose: config.component.pkgName }),
+			standalone = browserify('./' + config.component.src + '/' + config.component.file, { standalone: config.component.name })
 				.transform(reactify)
 				.transform(shim);
 		
-		DEPENDENCIES.forEach(function(pkg) {
+		var examples = config.example.scripts.map(function(file) {
+			return {
+				file: file,
+				bundle: browserify(opts).exclude(config.component.pkgName).add('./' + config.example.src + '/' + file)
+			};
+		});
+		
+		config.component.dependencies.forEach(function(pkg) {
 			common.require(pkg);
 			bundle.exclude(pkg);
-			example.exclude(pkg);
 			standalone.exclude(pkg);
+			examples.forEach(function(eg) {
+				eg.bundle.exclude(pkg);
+			});
 		});
 		
 		if (dev) {
 			watchBundle(common, 'common.js', dest);
 			watchBundle(bundle, 'bundle.js', dest);
-			watchBundle(example, 'app.js', dest);
 			watchBundle(standalone, 'standalone.js', dest);
+			examples.forEach(function(eg) {
+				watchBundle(eg.bundle, eg.file, dest);
+			});
 		}
 		
-		return merge(
+		return merge([
 			doBundle(common, 'common.js', dest),
 			doBundle(bundle, 'bundle.js', dest),
-			doBundle(example, 'app.js', dest),
 			doBundle(standalone, 'standalone.js', dest)
-		);
+		].concat(examples.map(function(eg) {
+			return doBundle(eg.bundle, eg.file, dest);
+		})));
 		
 	}
 
@@ -180,8 +177,8 @@ gulp.task('watch:examples', [
 	'dev:build:example:css',
 	'dev:build:example:scripts'
 ], function() {
-	gulp.watch(EXAMPLE_FILES.map(function(i) { return EXAMPLE_SRC_PATH + '/' + i }), ['dev:build:example:files']);
-	gulp.watch([EXAMPLE_SRC_PATH + './' + EXAMPLE_LESS], ['dev:build:example:css']);
+	gulp.watch(config.example.files.map(function(i) { return config.example.src + '/' + i }), ['dev:build:example:files']);
+	gulp.watch([config.example.src + './' + config.example.stylesheets], ['dev:build:example:css']);
 });
 
 
@@ -191,7 +188,7 @@ gulp.task('watch:examples', [
 
 gulp.task('dev:server', function() {
 	connect.server({
-		root: EXAMPLE_DIST_PATH,
+		root: config.example.dist,
 		port: 8000,
 		livereload: true
 	});
@@ -213,18 +210,18 @@ gulp.task('dev', [
  */
 
 gulp.task('prepare:dist', function(done) {
-	del([DIST_PATH], done);
+	del([config.component.dist], done);
 });
 
 gulp.task('build:dist', ['prepare:dist'], function() {
 	
-	var standalone = browserify('./' + SRC_PATH + '/' + PACKAGE_FILE, {
-			standalone: COMPONENT_NAME
+	var standalone = browserify('./' + config.component.src + '/' + config.component.file, {
+			standalone: config.component.name
 		})
 		.transform(reactify)
 		.transform(shim);
 	
-	DEPENDENCIES.forEach(function(pkg) {
+	config.component.dependencies.forEach(function(pkg) {
 		standalone.exclude(pkg);
 	});
 	
@@ -232,11 +229,11 @@ gulp.task('build:dist', ['prepare:dist'], function() {
 		.on('error', function(e) {
 			gutil.log('Browserify Error', e);
 		})
-		.pipe(source(PACKAGE_NAME + '.js'))
-		.pipe(gulp.dest(DIST_PATH))
-		.pipe(rename(PACKAGE_NAME + '.min.js'))
+		.pipe(source(config.component.pkgName + '.js'))
+		.pipe(gulp.dest(config.component.dist))
+		.pipe(rename(config.component.pkgName + '.min.js'))
 		.pipe(streamify(uglify()))
-		.pipe(gulp.dest(DIST_PATH));
+		.pipe(gulp.dest(config.component.dist));
 	
 });
 
@@ -300,7 +297,7 @@ gulp.task('publish:npm', function(done) {
  */
 
 gulp.task('publish:examples', ['build:examples'], function() {
-	return gulp.src(EXAMPLE_DIST_PATH + '/**/*').pipe(deploy());
+	return gulp.src(config.example.dist + '/**/*').pipe(deploy());
 });
 
 gulp.task('release', ['publish:tag', 'publish:npm', 'publish:examples']);
