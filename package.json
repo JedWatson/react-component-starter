@@ -11,6 +11,9 @@
     "type": "git",
     "url": "https://github.com/JedWatson/react-component-starter.git"
   },
+  "bugs": {
+    "url": "https://github.com/JedWatson/react-component-starter/issues"
+  },
   "dependencies": {
     "react": "^0.12.1",
     "reactify": "^0.15.2"
