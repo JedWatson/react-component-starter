@@ -9,7 +9,7 @@ var gulp = require('gulp'),
  * and directory configuration there
  */
 
-var config = require('./config');
+var config = require('./gulpconfig');
 
 
 /**

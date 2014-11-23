@@ -1,5 +1,5 @@
 /*
- * This file controls the behaviour of the build tasks in gulpfile.json
+ * This file controls the behaviour of the build tasks in gulpfile.js
  */
 
 var COMPONENT_NAME = 'MyComponent';
