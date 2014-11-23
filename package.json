@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "description": "My React Component",
-  "main": "dist/Component.js",
+  "main": "src/Component.js",
   "author": "Jed Watson",
   "license": "MIT",
   "homepage": "https://github.com/JedWatson/react-component-starter",
