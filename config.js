@@ -4,7 +4,7 @@
 
 var COMPONENT_NAME = 'MyComponent';
 
-// Read the package.json to detect the name and dependencies
+// Read the package.json to detect the package name and dependencies
 var pkg = JSON.parse(require('fs').readFileSync('./package.json'));
 
 // Default dependencies from package.json, except reactify (which is used for
