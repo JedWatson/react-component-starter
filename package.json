@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "react": "~0.12.1",
+    "react-component-gulp-tasks": "^0.1.0",
     "reactify": "~0.15.2"
   },
   "devDependencies": {
